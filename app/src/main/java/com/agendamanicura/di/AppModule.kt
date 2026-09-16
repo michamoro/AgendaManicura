@@ -14,7 +14,7 @@ import javax.inject.Singleton
 
 @Module @InstallIn(SingletonComponent::class)
 object AppModule {
-    @Provides @Singleton fun database(@ApplicationContext context: Context): AgendaDatabase = Room.databaseBuilder(context, AgendaDatabase::class.java, "agenda-manicura.db").build()
+    @Provides @Singleton fun database(@ApplicationContext context: Context): AgendaDatabase = Room.databaseBuilder(context, AgendaDatabase::class.java, "agenda-manicura.db").addMigrations(AgendaDatabase.MIGRATION_1_2, AgendaDatabase.MIGRATION_2_3).build()
     @Provides @Singleton fun repository(db: AgendaDatabase) = AgendaRepository(db)
     @Provides @Singleton fun reminderPreferences(@ApplicationContext context: Context) = ReminderPreferences(context)
 }
