@@ -1,6 +1,7 @@
 package com.agendamanicura.data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -11,7 +12,8 @@ data class ClientEntity(
     val name: String,
     val phone: String = "",
     val contactDetails: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    @ColumnInfo(defaultValue = "1") val isActive: Boolean = true
 )
 
 @Entity(tableName = "services")
@@ -19,7 +21,6 @@ data class ServiceEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val icon: String = "manicure",
-    val durationMinutes: Int = 60,
     val basePriceCents: Long
 )
 
@@ -30,7 +31,6 @@ data class AppointmentEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val clientId: Long,
     val startAt: Long,
-    val durationMinutes: Int,
     val notes: String = "",
     val tipCents: Long = 0,
     val status: AppointmentStatus = AppointmentStatus.PENDING
@@ -45,6 +45,5 @@ data class AppointmentServiceEntity(
     val serviceId: Long,
     val serviceNameSnapshot: String,
     val iconSnapshot: String,
-    val durationMinutes: Int,
     val priceCents: Long
 )
