@@ -21,10 +21,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import com.agendamanicura.R
 import com.agendamanicura.data.*
 import java.time.*
 import java.time.format.DateTimeFormatter
@@ -106,6 +110,10 @@ private fun AppointmentStatusBadge(status: AppointmentStatus) {
 
 @Composable
 fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentStatus) -> Unit, delete: (AppointmentWithDetails) -> Unit, edit: (AppointmentWithDetails) -> Unit) {
+    val context = LocalContext.current
+    var showReminder by remember(item.appointment.id) { mutableStateOf(false) }
+    var reminderText by remember(item.appointment.id) { mutableStateOf(TextFieldValue(appointmentReminderText(item), selection = TextRange(0))) }
+    var reminderError by remember(item.appointment.id) { mutableStateOf<String?>(null) }
     Card(Modifier.fillMaxWidth().clickable { edit(item) }) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -120,15 +128,63 @@ fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentS
                 }
                 AppointmentStatusBadge(item.appointment.status)
             }
-            Row {
-                IconButton({ edit(item) }) { Icon(Icons.Default.Edit, "Editar cita") }
+            Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
+                IconButton({ showReminder = true }, modifier = Modifier.size(40.dp)) { Icon(painterResource(R.drawable.ic_whatsapp), "Enviar recordatorio por WhatsApp") }
                 when (item.appointment.status) {
-                    AppointmentStatus.PENDING -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PAID) }) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
-                    AppointmentStatus.PAID -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
-                    AppointmentStatus.CANCELLED -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.PENDING -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PAID) }, Modifier.size(40.dp)) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.PAID -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.CANCELLED -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
                 }
             }
         }
+    }
+    if (showReminder) AlertDialog(
+        onDismissRequest = { showReminder = false },
+        title = { Text("Recordatorio para ${item.client.name}") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Puedes ajustar el mensaje antes de enviarlo.", style = MaterialTheme.typography.bodySmall)
+            OutlinedTextField(reminderText, { reminderText = it }, modifier = Modifier.fillMaxWidth(), minLines = 8, maxLines = 12)
+            reminderError?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error) }
+        } },
+        confirmButton = { Button({
+            val phone = whatsappPhone(item.client.phone)
+            if (phone == null) reminderError = "Añade un teléfono válido para enviar por WhatsApp."
+            else runCatching {
+                val url = "https://wa.me/$phone?text=${Uri.encode(reminderText.text)}"
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).setPackage("com.whatsapp"))
+            }.onSuccess { showReminder = false }.onFailure { reminderError = "No se pudo abrir WhatsApp en este dispositivo." }
+        }) { Icon(Icons.Default.Send, null); Spacer(Modifier.width(6.dp)); Text("Abrir WhatsApp") } },
+        dismissButton = { TextButton({ showReminder = false }) { Text("Cancelar") } }
+    )
+}
+
+fun appointmentReminderText(item: AppointmentWithDetails): String {
+    val dateTime = Instant.ofEpochMilli(item.appointment.startAt).atZone(AgendaTime.zone)
+        .format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM 'a las' hh:mm a", Locale("es")))
+    return """Hola, buen día 🌸😊 ${item.client.name}
+
+Este es un recordatorio para tu cita:
+
+Fecha y hora del servicio:
+$dateTime
+
+Servicios:
+${item.services.joinToString("\n") { "• ${it.serviceNameSnapshot}" }}
+
+Dirección:
+Calle Miguel De Cervantes #3 1A
+Alhaurín el Grande (edificio)
+
+¡Nos vemos pronto! 😊"""
+}
+
+private fun whatsappPhone(value: String): String? {
+    val digits = value.filter(Char::isDigit).removePrefix("00")
+    if (digits.length < 7) return null
+    return when {
+        value.trim().startsWith("+") -> digits
+        digits.length == 9 -> "34$digits"
+        else -> digits
     }
 }
 
@@ -240,16 +296,13 @@ private fun ClientDialog(existing: ClientEntity, dismiss: () -> Unit, save: (Cli
 @Composable
 fun ServicesScreen(services: List<ServiceEntity>, save: (ServiceEntity) -> Unit, delete: (ServiceEntity, (String?) -> Unit) -> Unit) {
     var editing by remember { mutableStateOf<ServiceEntity?>(null) }; var deleting by remember { mutableStateOf<ServiceEntity?>(null) }; var message by remember { mutableStateOf<String?>(null) }; var showCatalog by remember { mutableStateOf(false) }
-    var query by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val catalogMessage = remember(services) { buildString { appendLine("Erika Nail Art servicios"); appendLine(); services.forEach { appendLine("${serviceEmoji(it.icon)} ${it.name}: ${it.basePriceCents.money()}") }; appendLine(); append("Cualquier duda que tengas, aquí estoy para ayudarte 💕") } }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Servicios", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ServiceEntity(name = "", basePriceCents = 0) }) { Icon(Icons.Default.Add, null); Text(" Añadir") } }
         OutlinedButton({ showCatalog = true }, modifier = Modifier.padding(top = 8.dp).fillMaxWidth()) { Icon(Icons.Default.Share, null); Spacer(Modifier.width(8.dp)); Text("Compartir catálogo de servicios") }
-        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar servicio") })
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 6.dp)) }
-        val filteredServices = services.filter { query.isBlank() || it.name.contains(query, true) }
-        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(filteredServices.size) { i -> val service = filteredServices[i]; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
+        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(services.size) { i -> val service = services[i]; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
     }
     editing?.let { service -> ServiceDialog(service, { editing = null }) { save(it); editing = null } }
     deleting?.let { service -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Eliminar servicio") }, text = { Text("¿Eliminar ${service.name}? Esta acción no se puede deshacer.") }, confirmButton = { Button({ delete(service) { error -> message = error; if (error == null) deleting = null } }) { Text("Eliminar") } }, dismissButton = { TextButton({ deleting = null }) { Text("Cancelar") } }) }
