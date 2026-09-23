@@ -6,3 +6,6 @@ fun overlaps(startA: Long, durationA: Int, startB: Long, durationB: Int): Boolea
     val endB = startB + durationB * 60_000L
     return startA < endB && startB < endA
 }
+
+fun hasMinimumAppointmentGap(candidateStart: Long, existingStart: Long, minimumMinutes: Int = 15): Boolean =
+    kotlin.math.abs(candidateStart - existingStart) < minimumMinutes * 60_000L

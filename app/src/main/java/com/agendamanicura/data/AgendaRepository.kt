@@ -8,6 +8,19 @@ import java.time.ZoneId
 import org.json.JSONArray
 import org.json.JSONObject
 
+data class BackupPreview(val createdAt: Long?, val clients: Int, val services: Int, val appointments: Int)
+
+fun parseBackupPreview(raw: String): BackupPreview {
+    val backup = JSONObject(raw)
+    require(backup.optInt("format") in 1..2) { "Este archivo no es una copia válida de Erika Nail Art." }
+    return BackupPreview(
+        createdAt = backup.optLong("createdAt").takeIf { it > 0 },
+        clients = backup.getJSONArray("clients").length(),
+        services = backup.getJSONArray("services").length(),
+        appointments = backup.getJSONArray("appointments").length()
+    )
+}
+
 class AgendaRepository(private val db: AgendaDatabase) {
     private val appointments = db.appointments()
     fun clients(): Flow<List<ClientEntity>> = db.clients().observeAll()
@@ -30,7 +43,8 @@ class AgendaRepository(private val db: AgendaDatabase) {
     suspend fun deleteAppointment(id: Long) { appointments.getById(id)?.let { appointments.delete(it.appointment) } }
     suspend fun createBackup(): String = db.withTransaction {
         JSONObject().apply {
-            put("format", 1)
+            put("format", 2)
+            put("createdAt", System.currentTimeMillis())
             put("clients", JSONArray(db.clients().all().map { client -> JSONObject().apply { put("id", client.id); put("name", client.name); put("phone", client.phone); put("contactDetails", client.contactDetails); put("notes", client.notes); put("isActive", client.isActive) } }))
             put("services", JSONArray(db.services().all().map { service -> JSONObject().apply { put("id", service.id); put("name", service.name); put("icon", service.icon); put("basePriceCents", service.basePriceCents) } }))
             put("appointments", JSONArray(appointments.all().map { item -> JSONObject().apply {
@@ -39,9 +53,10 @@ class AgendaRepository(private val db: AgendaDatabase) {
             } }))
         }.toString(2)
     }
+    fun previewBackup(raw: String): BackupPreview = parseBackupPreview(raw)
     suspend fun restoreBackup(raw: String) = db.withTransaction {
         val backup = JSONObject(raw)
-        require(backup.optInt("format") == 1) { "Este archivo no es una copia válida de Erika Nail Art." }
+        require(backup.optInt("format") in 1..2) { "Este archivo no es una copia válida de Erika Nail Art." }
         val clientIds = mutableMapOf<Long, Long>(); val serviceIds = mutableMapOf<Long, Long>()
         appointments.deleteAll(); db.clients().deleteAll(); db.services().deleteAll()
         val clients = backup.getJSONArray("clients")

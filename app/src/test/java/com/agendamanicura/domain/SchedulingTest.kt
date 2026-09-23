@@ -5,6 +5,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SchedulingTest {
-    @Test fun `detects intersecting appointments`() = assertTrue(overlaps(1_000, 60, 2_000, 30))
-    @Test fun `allows appointments that touch`() = assertFalse(overlaps(1_000, 60, 1_000 + 60 * 60_000L, 30))
+    @Test fun `blocks appointments less than fifteen minutes apart`() = assertTrue(hasMinimumAppointmentGap(1_000, 1_000 + 14 * 60_000L))
+    @Test fun `allows appointments exactly fifteen minutes apart`() = assertFalse(hasMinimumAppointmentGap(1_000, 1_000 + 15 * 60_000L))
 }

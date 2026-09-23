@@ -23,6 +23,7 @@ class AgendaViewModel @Inject constructor(private val repository: AgendaReposito
     val clients = repository.clients().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val services = repository.services().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val reminderHour = reminderPreferences.hour.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 9)
+    val lastBackupAt = reminderPreferences.lastBackupAt.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val appointments = month.flatMapLatest { repository.appointmentsForMonth(it.atDay(1)) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     fun previousMonth() { month.update { it.minusMonths(1) } }
     fun nextMonth() { month.update { it.plusMonths(1) } }
@@ -44,8 +45,11 @@ class AgendaViewModel @Inject constructor(private val repository: AgendaReposito
     fun setReminderHour(hour: Int) = viewModelScope.launch { reminderPreferences.setHour(hour) }
     fun testDailyReminder() { DailyReminder.test(appContext) }
     fun exportBackup(uri: Uri, onResult: (String) -> Unit) = viewModelScope.launch {
-        val result = runCatching { withContext(Dispatchers.IO) { appContext.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(repository.createBackup()) } ?: error("No se pudo crear el archivo") } }
+        val result = runCatching { withContext(Dispatchers.IO) { appContext.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(repository.createBackup()) } ?: error("No se pudo crear el archivo") }; reminderPreferences.markBackupSaved() }
         onResult(result.fold({ "Copia de seguridad guardada correctamente." }, { "No se pudo guardar la copia de seguridad." }))
+    }
+    fun previewBackup(uri: Uri, onResult: (Result<BackupPreview>) -> Unit) = viewModelScope.launch {
+        onResult(runCatching { withContext(Dispatchers.IO) { val content = appContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("No se pudo leer el archivo"); repository.previewBackup(content) } })
     }
     fun importBackup(uri: Uri, onResult: (String) -> Unit) = viewModelScope.launch {
         val result = runCatching { withContext(Dispatchers.IO) { val content = appContext.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("No se pudo leer el archivo"); repository.restoreBackup(content) } }

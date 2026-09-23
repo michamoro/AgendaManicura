@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +41,7 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
     var showEditor by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AppointmentWithDetails?>(null) }
     var deleting by remember { mutableStateOf<AppointmentWithDetails?>(null) }
+    var appointmentQuery by rememberSaveable { mutableStateOf("") }
     val byDay = appointments.groupBy { Instant.ofEpochMilli(it.appointment.startAt).atZone(ZoneId.systemDefault()).toLocalDate() }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -56,8 +58,12 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
             Text("Citas del ${selectedDay.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es")))}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             FilledTonalButton(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Cita") }
         }
-        val active = byDay[selectedDay].orEmpty().filter { it.appointment.status != AppointmentStatus.CANCELLED }
-        val cancelled = byDay[selectedDay].orEmpty().filter { it.appointment.status == AppointmentStatus.CANCELLED }
+        OutlinedTextField(appointmentQuery, { appointmentQuery = it }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar por clienta o servicio") })
+        val matching = byDay[selectedDay].orEmpty().filter { item ->
+            appointmentQuery.isBlank() || item.client.name.contains(appointmentQuery, true) || item.services.any { it.serviceNameSnapshot.contains(appointmentQuery, true) }
+        }
+        val active = matching.filter { it.appointment.status != AppointmentStatus.CANCELLED }
+        val cancelled = matching.filter { it.appointment.status == AppointmentStatus.CANCELLED }
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (active.isNotEmpty()) item { Text("Citas activas", style = MaterialTheme.typography.labelLarge) }
             items(active.size) { index -> AppointmentCard(active[index], vm::setStatus, { deleting = it }) { editing = it; showEditor = true } }
@@ -114,10 +120,13 @@ fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentS
                 }
                 AppointmentStatusBadge(item.appointment.status)
             }
-            when (item.appointment.status) {
-                AppointmentStatus.PENDING -> Row { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PAID) }) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
-                AppointmentStatus.PAID -> Row { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
-                AppointmentStatus.CANCELLED -> Row { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
+            Row {
+                IconButton({ edit(item) }) { Icon(Icons.Default.Edit, "Editar cita") }
+                when (item.appointment.status) {
+                    AppointmentStatus.PENDING -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PAID) }) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.PAID -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.CANCELLED -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }) { Icon(Icons.Default.Delete, "Eliminar") } }
+                }
             }
         }
     }
@@ -179,10 +188,13 @@ private fun validPhone(value: String): Boolean = Regex("^\\+?[0-9]{7,15}$").matc
 fun ClientsScreen(clients: List<ClientEntity>, save: (ClientEntity) -> Unit, setActive: (ClientEntity, Boolean) -> Unit) {
     var editing by remember { mutableStateOf<ClientEntity?>(null) }
     var changingStatus by remember { mutableStateOf<ClientEntity?>(null) }
-    val activeClients = clients.filter { it.isActive }
-    val inactiveClients = clients.filterNot { it.isActive }
+    var query by rememberSaveable { mutableStateOf("") }
+    val filteredClients = clients.filter { query.isBlank() || it.name.contains(query, true) || it.phone.contains(query) }
+    val activeClients = filteredClients.filter { it.isActive }
+    val inactiveClients = filteredClients.filterNot { it.isActive }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Clientas", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ClientEntity(name = "") }) { Icon(Icons.Default.PersonAdd, null); Text(" Añadir") } }
+        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar por nombre o teléfono") })
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Activas (${activeClients.size})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp)) }
             item { ClientGrid(activeClients, isActive = true, onEdit = { editing = it }, onStatus = { changingStatus = it }) }
@@ -201,7 +213,8 @@ fun ClientsScreen(clients: List<ClientEntity>, save: (ClientEntity) -> Unit, set
 
 @Composable
 private fun ClientGrid(clients: List<ClientEntity>, isActive: Boolean, onEdit: (ClientEntity) -> Unit, onStatus: (ClientEntity) -> Unit) {
-    LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.heightIn(max = 320.dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), userScrollEnabled = false) {
+    val rowCount = (clients.size + 1) / 2
+    LazyVerticalGrid(columns = GridCells.Fixed(2), modifier = Modifier.height((rowCount * 102).dp), verticalArrangement = Arrangement.spacedBy(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), userScrollEnabled = false) {
         items(clients) { client ->
             Card(Modifier.fillMaxWidth().height(94.dp).clickable { onEdit(client) }) {
                 Column(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp)) {
@@ -227,13 +240,16 @@ private fun ClientDialog(existing: ClientEntity, dismiss: () -> Unit, save: (Cli
 @Composable
 fun ServicesScreen(services: List<ServiceEntity>, save: (ServiceEntity) -> Unit, delete: (ServiceEntity, (String?) -> Unit) -> Unit) {
     var editing by remember { mutableStateOf<ServiceEntity?>(null) }; var deleting by remember { mutableStateOf<ServiceEntity?>(null) }; var message by remember { mutableStateOf<String?>(null) }; var showCatalog by remember { mutableStateOf(false) }
+    var query by rememberSaveable { mutableStateOf("") }
     val context = LocalContext.current
     val catalogMessage = remember(services) { buildString { appendLine("Erika Nail Art servicios"); appendLine(); services.forEach { appendLine("${serviceEmoji(it.icon)} ${it.name}: ${it.basePriceCents.money()}") }; appendLine(); append("Cualquier duda que tengas, aquí estoy para ayudarte 💕") } }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Servicios", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ServiceEntity(name = "", basePriceCents = 0) }) { Icon(Icons.Default.Add, null); Text(" Añadir") } }
         OutlinedButton({ showCatalog = true }, modifier = Modifier.padding(top = 8.dp).fillMaxWidth()) { Icon(Icons.Default.Share, null); Spacer(Modifier.width(8.dp)); Text("Compartir catálogo de servicios") }
+        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar servicio") })
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 6.dp)) }
-        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(services.size) { i -> val service = services[i]; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
+        val filteredServices = services.filter { query.isBlank() || it.name.contains(query, true) }
+        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(filteredServices.size) { i -> val service = filteredServices[i]; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
     }
     editing?.let { service -> ServiceDialog(service, { editing = null }) { save(it); editing = null } }
     deleting?.let { service -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Eliminar servicio") }, text = { Text("¿Eliminar ${service.name}? Esta acción no se puede deshacer.") }, confirmButton = { Button({ delete(service) { error -> message = error; if (error == null) deleting = null } }) { Text("Eliminar") } }, dismissButton = { TextButton({ deleting = null }) { Text("Cancelar") } }) }
@@ -300,12 +316,17 @@ private fun MonthPickerDialog(initial: YearMonth, confirm: (YearMonth) -> Unit, 
 @Composable
 fun SettingsScreen(vm: AgendaViewModel) {
     val hour by vm.reminderHour.collectAsState()
+    val lastBackupAt by vm.lastBackupAt.collectAsState()
     var showTimePicker by remember { mutableStateOf(false) }
     var testStarted by remember { mutableStateOf(false) }
     var backupMessage by remember { mutableStateOf<String?>(null) }
     var pendingImport by remember { mutableStateOf<Uri?>(null) }
+    var backupPreview by remember { mutableStateOf<BackupPreview?>(null) }
     val exportBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let { vm.exportBackup(it) { message -> backupMessage = message } } }
-    val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> pendingImport = uri }
+    val importBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { selectedUri ->
+        pendingImport = selectedUri
+        vm.previewBackup(selectedUri) { result -> result.onSuccess { backupPreview = it }.onFailure { error -> pendingImport = null; backupMessage = error.message ?: "No se pudo leer la copia de seguridad." } }
+    } }
     LaunchedEffect(testStarted) {
         if (testStarted) {
             delay(3_000)
@@ -323,6 +344,8 @@ fun SettingsScreen(vm: AgendaViewModel) {
         HorizontalDivider(Modifier.padding(vertical = 4.dp))
         Text("Copia de seguridad", style = MaterialTheme.typography.titleMedium)
         Text("Guarda tus clientas, servicios y citas para recuperarlos en otro teléfono.", style = MaterialTheme.typography.bodyMedium)
+        val lastBackupText = lastBackupAt?.let { Instant.ofEpochMilli(it).atZone(AgendaTime.zone).format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm", Locale("es"))) }
+        Text(lastBackupText?.let { "Última copia guardada: $it" } ?: "Aún no has guardado una copia en este dispositivo.", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
         OutlinedButton({ exportBackup.launch("erika-nail-art-backup.json") }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.Save, null); Spacer(Modifier.width(8.dp)); Text("Guardar copia de seguridad") }
         Button({ importBackup.launch(arrayOf("application/json", "text/*")) }, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.UploadFile, null); Spacer(Modifier.width(8.dp)); Text("Importar copia de seguridad") }
         backupMessage?.let { Text(it, color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelMedium) }
@@ -331,5 +354,20 @@ fun SettingsScreen(vm: AgendaViewModel) {
         val picker = rememberTimePickerState(initialHour = hour, initialMinute = 0, is24Hour = false)
         AlertDialog(onDismissRequest = { showTimePicker = false }, title = { Text("Hora del aviso") }, text = { TimePicker(picker) }, confirmButton = { TextButton({ vm.setReminderHour(picker.hour); showTimePicker = false }) { Text("Aceptar") } }, dismissButton = { TextButton({ showTimePicker = false }) { Text("Cancelar") } })
     }
-    pendingImport?.let { uri -> AlertDialog(onDismissRequest = { pendingImport = null }, title = { Text("Restaurar copia de seguridad") }, text = { Text("Se reemplazarán las clientas, los servicios y las citas que tienes ahora. Esta acción no se puede deshacer.") }, confirmButton = { Button({ vm.importBackup(uri) { message -> backupMessage = message }; pendingImport = null }) { Text("Restaurar") } }, dismissButton = { TextButton({ pendingImport = null }) { Text("Cancelar") } }) }
+    if (pendingImport != null && backupPreview != null) {
+        val uri = pendingImport!!
+        val preview = backupPreview!!
+        val created = preview.createdAt?.let { Instant.ofEpochMilli(it).atZone(AgendaTime.zone).format(DateTimeFormatter.ofPattern("dd/MM/yyyy 'a las' HH:mm", Locale("es"))) } ?: "fecha no disponible"
+        AlertDialog(
+            onDismissRequest = { pendingImport = null; backupPreview = null },
+            title = { Text("Revisar copia de seguridad") },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Copia creada: $created")
+                Text("${preview.clients} ${if (preview.clients == 1) "clienta" else "clientas"} · ${preview.services} ${if (preview.services == 1) "servicio" else "servicios"} · ${preview.appointments} ${if (preview.appointments == 1) "cita" else "citas"}", fontWeight = FontWeight.Bold)
+                Text("Al restaurarla se reemplazarán las clientas, los servicios y las citas que tienes ahora. Esta acción no se puede deshacer.")
+            } },
+            confirmButton = { Button({ vm.importBackup(uri) { message -> backupMessage = message }; pendingImport = null; backupPreview = null }) { Text("Restaurar") } },
+            dismissButton = { TextButton({ pendingImport = null; backupPreview = null }) { Text("Cancelar") } }
+        )
+    }
 }
