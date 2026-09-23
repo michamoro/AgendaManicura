@@ -10,7 +10,8 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - The current date is selected automatically when the app opens.
 - Create and edit appointments with a client, date, AM/PM time, one or more services, per-appointment prices, tips, and service notes.
 - Appointment cards show the service total and tip separately, retain notes, and support pending, paid, and cancelled statuses.
-- A visible edit action, plus actions to mark an appointment as paid, return it to pending, cancel it, or delete it.
+- Tap an appointment to edit it; its card also offers WhatsApp reminder, payment, pending, cancellation, and deletion actions.
+- The WhatsApp action opens an editable, client-specific reminder with the appointment date, time, services, and salon address already filled in.
 - The app prevents appointments less than 15 minutes apart, without imposing artificial service durations.
 - Search the appointments of the selected day by client name or service name.
 
@@ -19,7 +20,6 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - Create, edit, search, deactivate, and reactivate clients while preserving their appointment history.
 - Client search works by name or telephone number; the responsive two-column grid supports any number of client cards without truncating records.
 - Create, edit, and remove services with a price and custom icon.
-- Search services by name.
 - Generate a polished service catalogue with prices and share it through the Android share sheet.
 
 ### Income
@@ -36,6 +36,11 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - A test button sends a notification immediately and its temporary sending message clears automatically.
 - Tapping a notification opens the Agenda directly on the current date.
 
+### WhatsApp client reminders
+
+- Review and edit every prefilled reminder before WhatsApp opens, then send it normally from the conversation.
+- Local nine-digit Spanish phone numbers are prepared with the `+34` country code; international numbers keep their existing prefix.
+
 ### Backups and privacy
 
 - Export all clients, services, appointments, statuses, prices, tips, and notes to a portable JSON backup.
@@ -46,7 +51,8 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 
 ### Brand and accessibility
 
-- Branded Erika Nail Art launcher icon and floral welcome screen.
+- Full-bleed adaptive Erika Nail Art launcher icon that fills Android's circular mask without a white inner border.
+- Floral welcome screen aligned with the Erika Nail Art identity.
 - Welcome screen includes the developer credit: “Developed by / Michael Moncada”.
 - High-contrast, bold cursive typography and enlarged type scale across the interface.
 
