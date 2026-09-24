@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [ClientEntity::class, ServiceEntity::class, AppointmentEntity::class, AppointmentServiceEntity::class], version = 3, exportSchema = false)
+@Database(entities = [ClientEntity::class, ServiceEntity::class, AppointmentEntity::class, AppointmentServiceEntity::class], version = 4, exportSchema = false)
 abstract class AgendaDatabase : RoomDatabase() {
     abstract fun clients(): ClientDao
     abstract fun services(): ServiceDao
@@ -36,6 +36,12 @@ abstract class AgendaDatabase : RoomDatabase() {
                 db.execSQL("INSERT INTO `appointment_services` (`appointmentId`, `serviceId`, `serviceNameSnapshot`, `iconSnapshot`, `priceCents`) SELECT `appointmentId`, `serviceId`, `serviceNameSnapshot`, `iconSnapshot`, `priceCents` FROM `appointment_services_backup`")
                 db.execSQL("CREATE INDEX `index_appointment_services_serviceId` ON `appointment_services` (`serviceId`)")
                 db.execSQL("DROP TABLE `appointment_services_backup`")
+            }
+        }
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE services ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE services SET sortOrder = id")
             }
         }
     }

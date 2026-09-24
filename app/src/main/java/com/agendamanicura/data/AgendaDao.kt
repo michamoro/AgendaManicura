@@ -15,8 +15,9 @@ interface ClientDao {
 
 @Dao
 interface ServiceDao {
-    @Query("SELECT * FROM services ORDER BY name COLLATE NOCASE") fun observeAll(): Flow<List<ServiceEntity>>
-    @Query("SELECT * FROM services ORDER BY id") suspend fun all(): List<ServiceEntity>
+    @Query("SELECT * FROM services ORDER BY sortOrder, name COLLATE NOCASE") fun observeAll(): Flow<List<ServiceEntity>>
+    @Query("SELECT * FROM services ORDER BY sortOrder, name COLLATE NOCASE") suspend fun all(): List<ServiceEntity>
+    @Query("SELECT COALESCE(MAX(sortOrder), 0) + 1 FROM services") suspend fun nextSortOrder(): Long
     @Insert suspend fun insert(service: ServiceEntity): Long
     @Update suspend fun update(service: ServiceEntity)
     @Delete suspend fun delete(service: ServiceEntity)

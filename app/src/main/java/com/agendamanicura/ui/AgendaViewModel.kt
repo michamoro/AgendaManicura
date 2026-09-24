@@ -30,6 +30,7 @@ class AgendaViewModel @Inject constructor(private val repository: AgendaReposito
     fun saveClient(client: ClientEntity) = viewModelScope.launch { if (client.name.isNotBlank()) repository.saveClient(client.copy(name = client.name.trim(), phone = client.phone.trim(), contactDetails = client.contactDetails.trim(), notes = client.notes.trim())) }
     fun setClientActive(client: ClientEntity, isActive: Boolean) = viewModelScope.launch { repository.saveClient(client.copy(isActive = isActive)) }
     fun saveService(service: ServiceEntity) = viewModelScope.launch { if (service.name.isNotBlank() && service.basePriceCents > 0) repository.saveService(service.copy(name = service.name.trim())) }
+    fun moveService(service: ServiceEntity, direction: Int) = viewModelScope.launch { repository.moveService(service, direction) }
     fun deleteService(service: ServiceEntity, onResult: (String?) -> Unit) = viewModelScope.launch {
         runCatching { repository.deleteService(service) }.onSuccess { onResult(null) }.onFailure { onResult("No se puede eliminar un servicio usado en una cita.") }
     }

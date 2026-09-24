@@ -105,7 +105,7 @@ fun AgendaApp(vm: AgendaViewModel, agendaRequest: Int = 0) {
         Surface(modifier = androidx.compose.ui.Modifier.padding(padding)) { when (screen) {
             "agenda" -> CalendarScreen(vm, clients, services)
             "clientes" -> ClientsScreen(clients, vm::saveClient, vm::setClientActive)
-            "servicios" -> ServicesScreen(services, vm::saveService, vm::deleteService)
+            "servicios" -> ServicesScreen(services, vm::saveService, vm::moveService, vm::deleteService)
             "ingresos" -> IncomeScreen(vm, clients)
             else -> SettingsScreen(vm)
         } }

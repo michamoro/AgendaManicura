@@ -20,7 +20,7 @@ import java.util.Locale
 
 class DailyAgendaWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val targetDate = AgendaTime.today().plusDays(1); val db = Room.databaseBuilder(applicationContext, AgendaDatabase::class.java, "agenda-manicura.db").addMigrations(AgendaDatabase.MIGRATION_1_2, AgendaDatabase.MIGRATION_2_3).build()
+        val targetDate = AgendaTime.today().plusDays(1); val db = Room.databaseBuilder(applicationContext, AgendaDatabase::class.java, "agenda-manicura.db").addMigrations(AgendaDatabase.MIGRATION_1_2, AgendaDatabase.MIGRATION_2_3, AgendaDatabase.MIGRATION_3_4).build()
         val appointments = db.appointments().observeBetween(targetDate.atStartOfDay(AgendaTime.zone).toInstant().toEpochMilli(), targetDate.plusDays(1).atStartOfDay(AgendaTime.zone).toInstant().toEpochMilli()).first().filter { it.appointment.status != AppointmentStatus.CANCELLED }
         db.close()
         val manager = applicationContext.getSystemService(NotificationManager::class.java)

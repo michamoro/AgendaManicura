@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -50,7 +51,7 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             IconButton(vm::previousMonth) { Icon(Icons.Default.ChevronLeft, "Mes anterior") }
-            Text("${month.month.getDisplayName(TextStyle.FULL, Locale("es"))} ${month.year}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(month.displayMonthYear(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             IconButton(vm::nextMonth) { Icon(Icons.Default.ChevronRight, "Mes siguiente") }
         }
         Row(Modifier.fillMaxWidth()) { listOf("L", "M", "X", "J", "V", "S", "D").forEach { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) } }
@@ -62,7 +63,7 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
             Text("Citas del ${selectedDay.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es")))}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             FilledTonalButton(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Cita") }
         }
-        OutlinedTextField(appointmentQuery, { appointmentQuery = it }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar por clienta o servicio") })
+        OutlinedTextField(appointmentQuery, { appointmentQuery = it }, modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por clienta o servicio", style = MaterialTheme.typography.labelSmall) })
         val matching = byDay[selectedDay].orEmpty().filter { item ->
             appointmentQuery.isBlank() || item.client.name.contains(appointmentQuery, true) || item.services.any { it.serviceNameSnapshot.contains(appointmentQuery, true) }
         }
@@ -96,7 +97,7 @@ private fun DayCell(day: LocalDate, selected: Boolean, items: List<AppointmentWi
 }
 
 private fun serviceEmoji(icon: String) = when (icon) { "manicure" -> "💅"; "pedicure" -> "🦶"; "nails" -> "✨"; else -> icon.ifBlank { "✨" } }
-@Composable fun ServiceIcon(icon: String, size: androidx.compose.ui.unit.TextUnit = 19.2.sp) = Text(serviceEmoji(icon), modifier = Modifier.padding(end = 3.dp), fontSize = size)
+@Composable fun ServiceIcon(icon: String, size: androidx.compose.ui.unit.TextUnit = 19.2.sp) = Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(serviceEmoji(icon), fontSize = size) }
 
 @Composable
 private fun AppointmentStatusBadge(status: AppointmentStatus) {
@@ -203,12 +204,28 @@ fun AppointmentEditor(clients: List<ClientEntity>, services: List<ServiceEntity>
     var popupError by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showServicePicker by remember { mutableStateOf(false) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (existing == null) "Nueva cita" else "Editar cita") }, text = {
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Clienta"); ClientPicker(clients, clientId) { clientId = it; popupError = null } }
             item { OutlinedButton({ showDatePicker = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.width(8.dp)); Text("Fecha: ${date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}") }; OutlinedButton({ showTimePicker = true }, Modifier.fillMaxWidth()) { Icon(Icons.Default.Schedule, null); Spacer(Modifier.width(8.dp)); Text("Hora: ${time.format(DateTimeFormatter.ofPattern("hh:mm a", Locale("es")))}") } }
-            item { Text("Servicios", fontWeight = FontWeight.Bold) }
-            items(services.size) { i -> val service = services[i]; Column { Row(Modifier.fillMaxWidth().clickable { selected = selected.toggle(service.id); popupError = null }, verticalAlignment = Alignment.CenterVertically) { Checkbox(selected.contains(service.id), { selected = selected.toggle(service.id); popupError = null }); ServiceIcon(service.icon); Text("${service.name} · ${service.basePriceCents.money()}", modifier = Modifier.padding(start = 6.dp)) }; if (selected.contains(service.id)) OutlinedTextField(priceText[service.id] ?: service.basePriceCents.let { "%.2f".format(it / 100.0) }, { priceText[service.id] = it }, label = { Text("Precio para esta cita (€)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) } }
+            item {
+                Text("Servicios", fontWeight = FontWeight.Bold)
+                OutlinedButton({ showServicePicker = true }, Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.Add, null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (selected.isEmpty()) "Añadir servicios" else "Servicios seleccionados (${selected.size})")
+                }
+            }
+            items(services.filter { selected.contains(it.id) }) { service ->
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ServiceIcon(service.icon)
+                        Text(service.name, modifier = Modifier.padding(start = 6.dp), fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedTextField(priceText[service.id] ?: service.basePriceCents.let { "%.2f".format(it / 100.0) }, { priceText[service.id] = it }, label = { Text("Precio para esta cita (€)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                }
+            }
             item { OutlinedTextField(tip, { tip = it }, label = { Text("Propina (€)") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
             item { OutlinedTextField(notes, { notes = it }, label = { Text("Notas del servicio") }, modifier = Modifier.fillMaxWidth()) }
         }
@@ -229,9 +246,38 @@ fun AppointmentEditor(clients: List<ClientEntity>, services: List<ServiceEntity>
         val picker = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = false)
         AlertDialog(onDismissRequest = { showTimePicker = false }, title = { Text("Selecciona la hora") }, text = { TimePicker(picker) }, confirmButton = { TextButton(onClick = { time = LocalTime.of(picker.hour, picker.minute); showTimePicker = false }) { Text("Aceptar") } }, dismissButton = { TextButton({ showTimePicker = false }) { Text("Cancelar") } })
     }
+    if (showServicePicker) {
+        ServicePickerDialog(services, selected, { selected = it; popupError = null }) { showServicePicker = false }
+    }
     popupError?.let { message ->
         AlertDialog(onDismissRequest = { popupError = null }, confirmButton = { TextButton({ popupError = null }) { Text("Entendido") } }, title = { Text("Revisa la cita") }, text = { Text(message) })
     }
+}
+
+@Composable
+private fun ServicePickerDialog(services: List<ServiceEntity>, selected: Set<Long>, onSelectedChange: (Set<Long>) -> Unit, dismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text("Añadir servicios") },
+        text = {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items(services) { service ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onSelectedChange(selected.toggle(service.id)) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(selected.contains(service.id), { onSelectedChange(selected.toggle(service.id)) })
+                        ServiceIcon(service.icon)
+                        Column(Modifier.padding(start = 6.dp)) {
+                            Text(service.name, fontWeight = FontWeight.Bold)
+                            Text(service.basePriceCents.money(), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(dismiss) { Text("Listo") } }
+    )
 }
 
 @Composable
@@ -250,7 +296,7 @@ fun ClientsScreen(clients: List<ClientEntity>, save: (ClientEntity) -> Unit, set
     val inactiveClients = filteredClients.filterNot { it.isActive }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Clientas", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ClientEntity(name = "") }) { Icon(Icons.Default.PersonAdd, null); Text(" Añadir") } }
-        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true, leadingIcon = { Icon(Icons.Default.Search, null) }, label = { Text("Buscar por nombre o teléfono") })
+        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 6.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por nombre o teléfono", style = MaterialTheme.typography.labelSmall) })
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Activas (${activeClients.size})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp)) }
             item { ClientGrid(activeClients, isActive = true, onEdit = { editing = it }, onStatus = { changingStatus = it }) }
@@ -293,27 +339,79 @@ private fun ClientDialog(existing: ClientEntity, dismiss: () -> Unit, save: (Cli
     AlertDialog(onDismissRequest = dismiss, title = { Text(if (existing.id == 0L) "Nueva clienta" else "Editar clienta") }, text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { OutlinedTextField(name, { name = it }, label = { Text("Nombre y apellido *") }, isError = invalidName, supportingText = { if (invalidName) Text("Indica nombre y apellido válidos") }); OutlinedTextField(phone, { phone = it }, label = { Text("Teléfono *") }, isError = invalidPhone, supportingText = { if (invalidPhone) Text("Usa entre 7 y 15 dígitos") }); OutlinedTextField(contact, { contact = it }, label = { Text("Otros datos de contacto") }); OutlinedTextField(notes, { notes = it }, label = { Text("Notas") }) } }, confirmButton = { Button({ attempted = true; if (validClientName(name) && validPhone(phone)) save(existing.copy(name = name, phone = phone, contactDetails = contact, notes = notes)) }) { Text("Guardar") } }, dismissButton = { TextButton(dismiss) { Text("Cancelar") } })
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ServicesScreen(services: List<ServiceEntity>, save: (ServiceEntity) -> Unit, delete: (ServiceEntity, (String?) -> Unit) -> Unit) {
-    var editing by remember { mutableStateOf<ServiceEntity?>(null) }; var deleting by remember { mutableStateOf<ServiceEntity?>(null) }; var message by remember { mutableStateOf<String?>(null) }; var showCatalog by remember { mutableStateOf(false) }
+fun ServicesScreen(services: List<ServiceEntity>, save: (ServiceEntity) -> Unit, move: (ServiceEntity, Int) -> Unit, delete: (ServiceEntity, (String?) -> Unit) -> Unit) {
+    var editing by remember { mutableStateOf<ServiceEntity?>(null) }; var deleting by remember { mutableStateOf<ServiceEntity?>(null) }; var message by remember { mutableStateOf<String?>(null) }; var showCatalog by remember { mutableStateOf(false) }; var selectedEmoji by rememberSaveable { mutableStateOf<String?>(null) }
     val context = LocalContext.current
-    val catalogMessage = remember(services) { buildString { appendLine("Erika Nail Art servicios"); appendLine(); services.forEach { appendLine("${serviceEmoji(it.icon)} ${it.name}: ${it.basePriceCents.money()}") }; appendLine(); append("Cualquier duda que tengas, aquí estoy para ayudarte 💕") } }
+    var catalogMessage by remember(services) { mutableStateOf(buildServiceCatalog(services)) }
+    val emojiFilters = remember(services) { services.map { serviceEmoji(it.icon) }.distinct() }
+    val visibleServices = services.filter { selectedEmoji == null || serviceEmoji(it.icon) == selectedEmoji }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Servicios", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ServiceEntity(name = "", basePriceCents = 0) }) { Icon(Icons.Default.Add, null); Text(" Añadir") } }
         OutlinedButton({ showCatalog = true }, modifier = Modifier.padding(top = 8.dp).fillMaxWidth()) { Icon(Icons.Default.Share, null); Spacer(Modifier.width(8.dp)); Text("Compartir catálogo de servicios") }
+        if (emojiFilters.isNotEmpty()) FlowRow(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            FilterChip(selectedEmoji == null, { selectedEmoji = null }, { Text("Todos") })
+            emojiFilters.forEach { emoji -> FilterChip(selectedEmoji == emoji, { selectedEmoji = if (selectedEmoji == emoji) null else emoji }, { Text(emoji) }) }
+        }
+        Text("Usa las flechas para ordenar el catálogo.", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
         message?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 6.dp)) }
-        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(services.size) { i -> val service = services[i]; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 10.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
+        LazyColumn(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) { items(visibleServices.size) { i -> val service = visibleServices[i]; val orderIndex = services.indexOfFirst { it.id == service.id }; Card(Modifier.fillMaxWidth().clickable { editing = service }) { Row(Modifier.padding(8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { ServiceIcon(service.icon); Column(Modifier.weight(1f).padding(start = 6.dp)) { Text(service.name, fontWeight = FontWeight.Bold); Text(service.basePriceCents.money()) }; Column { IconButton({ move(service, -1) }, enabled = orderIndex > 0) { Icon(Icons.Default.KeyboardArrowUp, "Subir") }; IconButton({ move(service, 1) }, enabled = orderIndex in 0 until services.lastIndex) { Icon(Icons.Default.KeyboardArrowDown, "Bajar") } }; IconButton({ editing = service }) { Icon(Icons.Default.Edit, "Editar") }; IconButton({ deleting = service }) { Icon(Icons.Default.Delete, "Eliminar") } } } } }
     }
     editing?.let { service -> ServiceDialog(service, { editing = null }) { save(it); editing = null } }
     deleting?.let { service -> AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Eliminar servicio") }, text = { Text("¿Eliminar ${service.name}? Esta acción no se puede deshacer.") }, confirmButton = { Button({ delete(service) { error -> message = error; if (error == null) deleting = null } }) { Text("Eliminar") } }, dismissButton = { TextButton({ deleting = null }) { Text("Cancelar") } }) }
-    if (showCatalog) AlertDialog(onDismissRequest = { showCatalog = false }, title = { Text("Catálogo para compartir") }, text = { Text(catalogMessage) }, confirmButton = { Button({ context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, catalogMessage), "Compartir catálogo")); showCatalog = false }) { Icon(Icons.Default.Share, null); Spacer(Modifier.width(6.dp)); Text("Compartir") } }, dismissButton = { TextButton({ showCatalog = false }) { Text("Cerrar") } })
+    if (showCatalog) AlertDialog(onDismissRequest = { showCatalog = false }, title = { Text("Editar catálogo antes de compartir") }, text = { OutlinedTextField(catalogMessage, { catalogMessage = it }, modifier = Modifier.fillMaxWidth(), minLines = 8, maxLines = 14, label = { Text("Mensaje para la clienta") }) }, confirmButton = { Button({ context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, catalogMessage), "Compartir catálogo")); showCatalog = false }) { Icon(Icons.Default.Share, null); Spacer(Modifier.width(6.dp)); Text("Compartir") } }, dismissButton = { TextButton({ showCatalog = false }) { Text("Cerrar") } })
+}
+
+private fun buildServiceCatalog(services: List<ServiceEntity>) = buildString {
+    appendLine("Erika Nail Art servicios")
+    appendLine()
+    services.forEach { appendLine("${serviceEmoji(it.icon)} ${it.name}: ${it.basePriceCents.money()}") }
+    appendLine()
+    appendLine("En los precios incluye la decoración (preguntar precios para decoración muy trabajada)")
+    appendLine()
+    append("Cualquier duda que tengas, aquí estoy para ayudarte 💕")
 }
 
 @Composable
 private fun ServiceDialog(existing: ServiceEntity, dismiss: () -> Unit, save: (ServiceEntity) -> Unit) {
-    var name by remember(existing.id) { mutableStateOf(existing.name) }; var price by remember(existing.id) { mutableStateOf(if (existing.basePriceCents == 0L) "" else "%.2f".format(existing.basePriceCents / 100.0)) }; var emoji by remember(existing.id) { mutableStateOf(serviceEmoji(existing.icon)) }; var invalid by remember { mutableStateOf(false) }
-    val emojis = listOf("💅", "🦶", "✨", "🎨", "🌸", "👁️", "👀", "🪄", "💄", "💆")
-    AlertDialog(onDismissRequest = dismiss, title = { Text(if (existing.id == 0L) "Nuevo servicio" else "Editar servicio") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(name, { name = it }, label = { Text("Nombre *") }, isError = invalid && name.isBlank()); OutlinedTextField(price, { price = it }, label = { Text("Precio (€)") }, isError = invalid && cents(price) <= 0); Text("Icono del servicio"); Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { emojis.chunked(5).forEach { row -> Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) { row.forEach { option -> FilterChip(emoji == option, { emoji = option }, { Text(option) }) } } } } } }, confirmButton = { Button({ invalid = true; if (name.isNotBlank() && cents(price) > 0) save(existing.copy(name = name.trim(), icon = emoji, basePriceCents = cents(price))) }) { Text("Guardar") } }, dismissButton = { TextButton(dismiss) { Text("Cancelar") } })
+    var name by remember(existing.id) { mutableStateOf(existing.name) }
+    var price by remember(existing.id) { mutableStateOf(if (existing.basePriceCents == 0L) "" else "%.2f".format(existing.basePriceCents / 100.0)) }
+    var emoji by remember(existing.id) { mutableStateOf(serviceEmoji(existing.icon)) }
+    var invalid by remember { mutableStateOf(false) }
+    val emojis = listOf("💅", "🦶", "✨", "🎨", "🌸", "👁️", "👀", "💋", "💄", "💆")
+    AlertDialog(
+        onDismissRequest = dismiss,
+        title = { Text(if (existing.id == 0L) "Nuevo servicio" else "Editar servicio") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Nombre *") }, isError = invalid && name.isBlank())
+                OutlinedTextField(price, { price = it }, label = { Text("Precio (€)") }, isError = invalid && cents(price) <= 0)
+                Text("Icono del servicio")
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    emojis.chunked(4).forEach { row ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                            row.forEach { option ->
+                                FilterChip(
+                                    selected = emoji == option,
+                                    onClick = { emoji = option },
+                                    modifier = Modifier.padding(horizontal = 2.dp),
+                                    label = { Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) { Text(option) } }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button({
+                invalid = true
+                if (name.isNotBlank() && cents(price) > 0) save(existing.copy(name = name.trim(), icon = emoji, basePriceCents = cents(price)))
+            }) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(dismiss) { Text("Cancelar") } }
+    )
 }
 
 private enum class IncomeRange { TODAY, MONTH, PERIOD }
@@ -326,13 +424,13 @@ fun IncomeScreen(vm: AgendaViewModel, clients: List<ClientEntity>) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Ingresos", style = MaterialTheme.typography.headlineSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { FilterChip(range == IncomeRange.TODAY, { range = IncomeRange.TODAY }, { Text("Hoy") }); FilterChip(range == IncomeRange.MONTH, { range = IncomeRange.MONTH; showMonthPicker = true }, { Text("Mes") }); FilterChip(range == IncomeRange.PERIOD, { range = IncomeRange.PERIOD }, { Text("Periodo") }) }
-        if (range == IncomeRange.MONTH) Text(selectedMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es"))), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { showMonthPicker = true }.padding(vertical = 4.dp))
+        if (range == IncomeRange.MONTH) Text(selectedMonth.displayMonthYear(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { showMonthPicker = true }.padding(top = 2.dp, bottom = 0.dp))
         if (range == IncomeRange.PERIOD) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton({ periodDateToEdit = true; periodWarning = null }) { Text("Desde ${periodStart.format(DateTimeFormatter.ofPattern("dd/MM/yy"))}") }
             OutlinedButton({ periodDateToEdit = false; periodWarning = null }) { Text("Hasta ${periodEnd.format(DateTimeFormatter.ofPattern("dd/MM/yy"))}") }
         }
         periodWarning?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall) }
-        Card(Modifier.padding(vertical = 16.dp).fillMaxWidth()) {
+        Card(Modifier.padding(top = 6.dp, bottom = 10.dp).fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Servicios", style = MaterialTheme.typography.labelLarge)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -363,7 +461,9 @@ fun IncomeScreen(vm: AgendaViewModel, clients: List<ClientEntity>) {
 }
 
 @Composable
-private fun MonthPickerDialog(initial: YearMonth, confirm: (YearMonth) -> Unit, dismiss: () -> Unit) { var displayed by remember { mutableStateOf(initial) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Elige un mes") }, text = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { IconButton({ displayed = displayed.minusMonths(1) }) { Icon(Icons.Default.ChevronLeft, "Mes anterior") }; Text(displayed.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es"))), style = MaterialTheme.typography.titleMedium); IconButton({ displayed = displayed.plusMonths(1) }) { Icon(Icons.Default.ChevronRight, "Mes siguiente") } } }, confirmButton = { TextButton({ confirm(displayed) }) { Text("Aplicar") } }, dismissButton = { TextButton(dismiss) { Text("Cancelar") } }) }
+private fun MonthPickerDialog(initial: YearMonth, confirm: (YearMonth) -> Unit, dismiss: () -> Unit) { var displayed by remember { mutableStateOf(initial) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Elige un mes") }, text = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { IconButton({ displayed = displayed.minusMonths(1) }) { Icon(Icons.Default.ChevronLeft, "Mes anterior") }; Text(displayed.displayMonthYear(), style = MaterialTheme.typography.titleMedium); IconButton({ displayed = displayed.plusMonths(1) }) { Icon(Icons.Default.ChevronRight, "Mes siguiente") } } }, confirmButton = { TextButton({ confirm(displayed) }) { Text("Aplicar") } }, dismissButton = { TextButton(dismiss) { Text("Cancelar") } }) }
+
+private fun YearMonth.displayMonthYear(): String = format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale("es"))).replaceFirstChar { character -> character.titlecase(Locale("es")) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

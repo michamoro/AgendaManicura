@@ -21,7 +21,8 @@ data class ServiceEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val icon: String = "manicure",
-    val basePriceCents: Long
+    val basePriceCents: Long,
+    @ColumnInfo(defaultValue = "0") val sortOrder: Long = 0
 )
 
 enum class AppointmentStatus { PENDING, PAID, CANCELLED }
