@@ -63,7 +63,7 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
             Text("Citas del ${selectedDay.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es")))}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             FilledTonalButton(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Cita") }
         }
-        OutlinedTextField(appointmentQuery, { appointmentQuery = it }, modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 4.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por clienta o servicio", style = MaterialTheme.typography.labelSmall) })
+        OutlinedTextField(appointmentQuery, { appointmentQuery = it }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp).height(56.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por clienta o servicio", style = MaterialTheme.typography.labelSmall) })
         val matching = byDay[selectedDay].orEmpty().filter { item ->
             appointmentQuery.isBlank() || item.client.name.contains(appointmentQuery, true) || item.services.any { it.serviceNameSnapshot.contains(appointmentQuery, true) }
         }
@@ -296,9 +296,9 @@ fun ClientsScreen(clients: List<ClientEntity>, save: (ClientEntity) -> Unit, set
     val inactiveClients = filteredClients.filterNot { it.isActive }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text("Clientas", style = MaterialTheme.typography.headlineSmall); FilledTonalButton({ editing = ClientEntity(name = "") }) { Icon(Icons.Default.PersonAdd, null); Text(" Añadir") } }
-        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().height(48.dp).padding(top = 6.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por nombre o teléfono", style = MaterialTheme.typography.labelSmall) })
+        OutlinedTextField(query, { query = it }, modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(56.dp), singleLine = true, textStyle = MaterialTheme.typography.bodySmall, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(20.dp)) }, label = { Text("Buscar por nombre o teléfono", style = MaterialTheme.typography.labelSmall) })
         LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Text("Activas (${activeClients.size})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 6.dp)) }
+            item { Text("Activas (${activeClients.size})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)) }
             item { ClientGrid(activeClients, isActive = true, onEdit = { editing = it }, onStatus = { changingStatus = it }) }
             if (inactiveClients.isNotEmpty()) {
                 item { Text("Desactivadas (${inactiveClients.size})", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 10.dp)) }
