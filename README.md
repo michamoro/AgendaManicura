@@ -9,6 +9,7 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - Monthly calendar using the Spain time zone, with accurate month lengths and a compact `1 cita` / `N citas` count for each day.
 - The current date is selected automatically when the app opens.
 - Create and edit appointments with a client, date, AM/PM time, one or more services, per-appointment prices, tips, and service notes.
+- Keep the appointment editor focused by choosing services from a dedicated selector; only the selected services and their per-appointment prices remain visible in the form.
 - Appointment cards show the service total and tip separately, retain notes, and support pending, paid, and cancelled statuses.
 - Tap an appointment to edit it; its card also offers WhatsApp reminder, payment, pending, cancellation, and deletion actions.
 - The WhatsApp action opens an editable, client-specific reminder with the appointment date, time, services, and salon address already filled in.
@@ -19,8 +20,9 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 
 - Create, edit, search, deactivate, and reactivate clients while preserving their appointment history.
 - Client search works by name or telephone number; the responsive two-column grid supports any number of client cards without truncating records.
-- Create, edit, and remove services with a price and custom icon.
-- Generate a polished service catalogue with prices and share it through the Android share sheet.
+- Create, edit, reorder, and remove services with a price and custom icon.
+- Filter services by their icon and use the saved manual order across the app.
+- Generate an editable service catalogue in that same order, then share it through the Android share sheet.
 
 ### Income
 
@@ -47,7 +49,7 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - Importing a backup first displays its creation date and the number of clients, services, and appointments it contains.
 - Restoration requires explicit confirmation because it replaces the local salon data.
 - Settings display the date and time of the latest backup saved on the device.
-- Backups are compatible with the current format and legacy format 1 backups; service durations are intentionally not stored.
+- Backups preserve the manual service order and are compatible with legacy formats 1 and 2; service durations are intentionally not stored.
 
 ### Brand and accessibility
 
