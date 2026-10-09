@@ -88,10 +88,17 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
 
 @Composable
 private fun DayCell(day: LocalDate, selected: Boolean, items: List<AppointmentWithDetails>, onClick: () -> Unit) {
-    Column(Modifier.padding(2.dp).aspectRatio(.86f).background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(4.dp), verticalArrangement = Arrangement.SpaceBetween) {
+    Column(Modifier.padding(2.dp).aspectRatio(.86f).background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(day.dayOfMonth.toString(), fontWeight = FontWeight.Bold)
         if (items.isNotEmpty()) {
-            Text("${items.size} ${if (items.size == 1) "cita" else "citas"}", modifier = Modifier.align(Alignment.CenterHorizontally).background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(4.dp)).padding(horizontal = 5.dp, vertical = 1.dp), fontSize = 12.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
+            Box(
+                modifier = Modifier.align(Alignment.End).height(30.dp)
+                    .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 3.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(items.size.toString(), fontSize = 24.sp, lineHeight = 24.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -281,7 +288,28 @@ private fun ServicePickerDialog(services: List<ServiceEntity>, selected: Set<Lon
 }
 
 @Composable
-private fun ClientPicker(clients: List<ClientEntity>, selected: Long, select: (Long) -> Unit) { var expanded by remember { mutableStateOf(false) }; Box { OutlinedButton({ expanded = true }, Modifier.fillMaxWidth()) { Text(clients.find { it.id == selected }?.name ?: "Selecciona una clienta") }; DropdownMenu(expanded, { expanded = false }) { clients.filter { it.isActive || it.id == selected }.forEach { DropdownMenuItem({ Text(it.name) }, { select(it.id); expanded = false }) } } } }
+private fun ClientPicker(clients: List<ClientEntity>, selected: Long, select: (Long) -> Unit) {
+    var query by remember { mutableStateOf(clients.find { it.id == selected }?.name.orEmpty()) }
+    var expanded by remember { mutableStateOf(false) }
+    val matches = clients.filter { (it.isActive || it.id == selected) && query.isNotBlank() && it.name.contains(query.trim(), ignoreCase = true) }
+    Box {
+        Column {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { value -> query = value; expanded = true; if (selected != 0L) select(0L) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Buscar clienta") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar clienta") },
+                trailingIcon = if (query.isNotEmpty()) ({ IconButton(onClick = { query = ""; expanded = true; select(0L) }) { Icon(Icons.Default.Close, "Borrar búsqueda") } }) else null
+            )
+            if (expanded && query.isNotBlank() && matches.isEmpty()) Text("No se encontraron clientas", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
+        }
+        DropdownMenu(expanded = expanded && query.isNotBlank() && matches.isNotEmpty(), onDismissRequest = { expanded = false }, modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+            matches.forEach { client -> DropdownMenuItem(text = { Text(client.name) }, onClick = { query = client.name; select(client.id); expanded = false }) }
+        }
+    }
+}
 private fun Set<Long>.toggle(id: Long) = if (contains(id)) minus(id) else plus(id)
 private fun validClientName(value: String) = Regex("^[\\p{L}][\\p{L} .'-]{1,59}$").matches(value.trim())
 private fun validPhone(value: String): Boolean = Regex("^\\+?[0-9]{7,15}$").matches(value.trim().replace(Regex("[ ()-]"), ""))
