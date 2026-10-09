@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -107,21 +109,27 @@ private fun serviceEmoji(icon: String) = when (icon) { "manicure" -> "💅"; "pe
 @Composable fun ServiceIcon(icon: String, size: androidx.compose.ui.unit.TextUnit = 19.2.sp) = Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(serviceEmoji(icon), fontSize = size) }
 
 @Composable
-private fun AppointmentStatusBadge(status: AppointmentStatus) {
+private fun AppointmentStatusBadge(status: AppointmentStatus, paymentMethod: PaymentMethod?, onPaymentClick: () -> Unit) {
     val (icon, label, tint) = when (status) {
         AppointmentStatus.PENDING -> Triple(Icons.Default.Schedule, "Creada", MaterialTheme.colorScheme.primary)
         AppointmentStatus.PAID -> Triple(Icons.Default.Paid, "Cobrada", Color(0xFF388E3C))
         AppointmentStatus.CANCELLED -> Triple(Icons.Default.Cancel, "Cancelada", MaterialTheme.colorScheme.error)
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { Icon(icon, label, tint = tint, modifier = Modifier.size(18.dp)); Text(label, style = MaterialTheme.typography.labelSmall, color = tint) }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = if (status == AppointmentStatus.PAID) Modifier.clickable(onClick = onPaymentClick) else Modifier) {
+        Icon(icon, label, tint = tint, modifier = Modifier.size(18.dp))
+        val paymentLabel = when (paymentMethod) { PaymentMethod.CASH -> "Efectivo"; PaymentMethod.CARD -> "Tarjeta"; null -> null }
+        Text(if (paymentLabel == null || status != AppointmentStatus.PAID) label else "$label · $paymentLabel", style = MaterialTheme.typography.labelSmall, color = tint)
+    }
 }
 
 @Composable
-fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentStatus) -> Unit, delete: (AppointmentWithDetails) -> Unit, edit: (AppointmentWithDetails) -> Unit) {
+fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentStatus, PaymentMethod?) -> Unit, delete: (AppointmentWithDetails) -> Unit, edit: (AppointmentWithDetails) -> Unit) {
     val context = LocalContext.current
     var showReminder by remember(item.appointment.id) { mutableStateOf(false) }
     var reminderText by remember(item.appointment.id) { mutableStateOf(TextFieldValue(appointmentReminderText(item), selection = TextRange(0))) }
     var reminderError by remember(item.appointment.id) { mutableStateOf<String?>(null) }
+    var showPaymentDialog by remember(item.appointment.id) { mutableStateOf(false) }
+    var selectedPaymentMethod by remember(item.appointment.id) { mutableStateOf(item.appointment.paymentMethod ?: PaymentMethod.CASH) }
     Card(Modifier.fillMaxWidth().clickable { edit(item) }) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -134,18 +142,34 @@ fun AppointmentCard(item: AppointmentWithDetails, setStatus: (Long, AppointmentS
                         Text("(Propina ${item.appointment.tipCents.money()})", color = Color(0xFF388E3C), style = MaterialTheme.typography.labelSmall)
                     }
                 }
-                AppointmentStatusBadge(item.appointment.status)
+                AppointmentStatusBadge(item.appointment.status, item.appointment.paymentMethod) { selectedPaymentMethod = item.appointment.paymentMethod ?: PaymentMethod.CASH; showPaymentDialog = true }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(0.dp)) {
                 IconButton({ showReminder = true }, modifier = Modifier.size(40.dp)) { Icon(painterResource(R.drawable.ic_whatsapp), "Enviar recordatorio por WhatsApp") }
                 when (item.appointment.status) {
-                    AppointmentStatus.PENDING -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PAID) }, Modifier.size(40.dp)) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
-                    AppointmentStatus.PAID -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
-                    AppointmentStatus.CANCELLED -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.PENDING -> { IconButton({ selectedPaymentMethod = PaymentMethod.CASH; showPaymentDialog = true }, Modifier.size(40.dp)) { Icon(Icons.Default.CheckCircle, "Marcar como cobrada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED, null) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.PAID -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING, null) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ setStatus(item.appointment.id, AppointmentStatus.CANCELLED, null) }, Modifier.size(40.dp)) { Icon(Icons.Default.Cancel, "Cancelar") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
+                    AppointmentStatus.CANCELLED -> { IconButton({ setStatus(item.appointment.id, AppointmentStatus.PENDING, null) }, Modifier.size(40.dp)) { Icon(Icons.Default.Undo, "Volver a creada") }; IconButton({ delete(item) }, Modifier.size(40.dp)) { Icon(Icons.Default.Delete, "Eliminar") } }
                 }
             }
         }
     }
+    if (showPaymentDialog) AlertDialog(
+        onDismissRequest = { showPaymentDialog = false },
+        title = { Text("Método de pago") },
+        text = {
+            Column {
+                PaymentMethod.entries.forEach { method ->
+                    Row(Modifier.fillMaxWidth().clickable { selectedPaymentMethod = method }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selectedPaymentMethod == method, { selectedPaymentMethod = method })
+                        Text(if (method == PaymentMethod.CASH) "Efectivo" else "Tarjeta")
+                    }
+                }
+            }
+        },
+        confirmButton = { Button({ setStatus(item.appointment.id, AppointmentStatus.PAID, selectedPaymentMethod); showPaymentDialog = false }) { Text("Guardar cobro") } },
+        dismissButton = { TextButton({ showPaymentDialog = false }) { Text("Cancelar") } }
+    )
     if (showReminder) AlertDialog(
         onDismissRequest = { showReminder = false },
         title = { Text("Recordatorio para ${item.client.name}") },
@@ -443,16 +467,27 @@ private fun ServiceDialog(existing: ServiceEntity, dismiss: () -> Unit, save: (S
 }
 
 private enum class IncomeRange { TODAY, MONTH, PERIOD }
+private enum class IncomePaymentFilter { ALL, CASH, CARD, UNSPECIFIED }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IncomeScreen(vm: AgendaViewModel, clients: List<ClientEntity>) {
     val today = LocalDate.now(); var range by remember { mutableStateOf(IncomeRange.MONTH) }; var selectedMonth by remember { mutableStateOf(YearMonth.now()) }; var periodStart by remember { mutableStateOf(today.minusDays(30)) }; var periodEnd by remember { mutableStateOf(today) }; var showMonthPicker by remember { mutableStateOf(false) }; var periodDateToEdit by remember { mutableStateOf<Boolean?>(null) }; var periodWarning by remember { mutableStateOf<String?>(null) }
-    val from = when (range) { IncomeRange.TODAY -> today; IncomeRange.MONTH -> selectedMonth.atDay(1); IncomeRange.PERIOD -> periodStart }; val until = when (range) { IncomeRange.TODAY -> today; IncomeRange.MONTH -> selectedMonth.atEndOfMonth(); IncomeRange.PERIOD -> periodEnd }; val paid by vm.income(from, until).collectAsState(initial = emptyList()); val serviceTotal = paid.sumOf { it.serviceTotalCents }; val tipsTotal = paid.sumOf { it.appointment.tipCents }; val total = serviceTotal + tipsTotal
+    var paymentFilter by remember { mutableStateOf(IncomePaymentFilter.ALL) }
+    val from = when (range) { IncomeRange.TODAY -> today; IncomeRange.MONTH -> selectedMonth.atDay(1); IncomeRange.PERIOD -> periodStart }; val until = when (range) { IncomeRange.TODAY -> today; IncomeRange.MONTH -> selectedMonth.atEndOfMonth(); IncomeRange.PERIOD -> periodEnd }; val allPaid by vm.income(from, until).collectAsState(initial = emptyList())
+    val cashCount = allPaid.count { it.appointment.paymentMethod == PaymentMethod.CASH }; val cardCount = allPaid.count { it.appointment.paymentMethod == PaymentMethod.CARD }; val unspecifiedCount = allPaid.count { it.appointment.paymentMethod == null }
+    val paid = allPaid.filter { item -> when (paymentFilter) { IncomePaymentFilter.ALL -> true; IncomePaymentFilter.CASH -> item.appointment.paymentMethod == PaymentMethod.CASH; IncomePaymentFilter.CARD -> item.appointment.paymentMethod == PaymentMethod.CARD; IncomePaymentFilter.UNSPECIFIED -> item.appointment.paymentMethod == null } }
+    val serviceTotal = paid.sumOf { it.serviceTotalCents }; val tipsTotal = paid.sumOf { it.appointment.tipCents }; val total = serviceTotal + tipsTotal
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Text("Ingresos", style = MaterialTheme.typography.headlineSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { FilterChip(range == IncomeRange.TODAY, { range = IncomeRange.TODAY }, { Text("Hoy") }); FilterChip(range == IncomeRange.MONTH, { range = IncomeRange.MONTH; showMonthPicker = true }, { Text("Mes") }); FilterChip(range == IncomeRange.PERIOD, { range = IncomeRange.PERIOD }, { Text("Periodo") }) }
         if (range == IncomeRange.MONTH) Text(selectedMonth.displayMonthYear(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.clickable { showMonthPicker = true }.padding(top = 2.dp, bottom = 0.dp))
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(paymentFilter == IncomePaymentFilter.ALL, { paymentFilter = IncomePaymentFilter.ALL }, { Text("Todos (${allPaid.size})") })
+            FilterChip(paymentFilter == IncomePaymentFilter.CASH, { paymentFilter = IncomePaymentFilter.CASH }, { Text("Efectivo ($cashCount)") })
+            FilterChip(paymentFilter == IncomePaymentFilter.CARD, { paymentFilter = IncomePaymentFilter.CARD }, { Text("Tarjeta ($cardCount)") })
+            if (unspecifiedCount > 0) FilterChip(paymentFilter == IncomePaymentFilter.UNSPECIFIED, { paymentFilter = IncomePaymentFilter.UNSPECIFIED }, { Text("Sin método ($unspecifiedCount)") })
+        }
         if (range == IncomeRange.PERIOD) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton({ periodDateToEdit = true; periodWarning = null }) { Text("Desde ${periodStart.format(DateTimeFormatter.ofPattern("dd/MM/yy"))}") }
             OutlinedButton({ periodDateToEdit = false; periodWarning = null }) { Text("Hasta ${periodEnd.format(DateTimeFormatter.ofPattern("dd/MM/yy"))}") }
@@ -470,7 +505,7 @@ fun IncomeScreen(vm: AgendaViewModel, clients: List<ClientEntity>) {
                 Text(total.money(), style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
             }
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(paid.size) { i -> val item = paid[i]; Card { Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Column { Text(item.client.name, fontWeight = FontWeight.Bold); Text(Instant.ofEpochMilli(item.appointment.startAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()); Text(item.services.joinToString { it.serviceNameSnapshot }, style = MaterialTheme.typography.bodySmall) }; Column(horizontalAlignment = Alignment.End) { Text(item.serviceTotalCents.money(), color = MaterialTheme.colorScheme.primary); if (item.appointment.tipCents > 0) Text("(Propina ${item.appointment.tipCents.money()})", color = Color(0xFF388E3C), style = MaterialTheme.typography.labelSmall) } } } } }
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) { items(paid.size) { i -> val item = paid[i]; Card { Row(Modifier.padding(12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Column { Text(item.client.name, fontWeight = FontWeight.Bold); Text(Instant.ofEpochMilli(item.appointment.startAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()); Text(item.services.joinToString { it.serviceNameSnapshot }, style = MaterialTheme.typography.bodySmall); Text(when (item.appointment.paymentMethod) { PaymentMethod.CASH -> "Efectivo"; PaymentMethod.CARD -> "Tarjeta"; null -> "Método de pago sin especificar" }, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }; Column(horizontalAlignment = Alignment.End) { Text(item.serviceTotalCents.money(), color = MaterialTheme.colorScheme.primary); if (item.appointment.tipCents > 0) Text("(Propina ${item.appointment.tipCents.money()})", color = Color(0xFF388E3C), style = MaterialTheme.typography.labelSmall) } } } } }
     }
     if (showMonthPicker) MonthPickerDialog(selectedMonth, { selectedMonth = it; showMonthPicker = false }, { showMonthPicker = false })
     periodDateToEdit?.let { editingStart ->

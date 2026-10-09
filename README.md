@@ -6,7 +6,7 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 
 ### Agenda
 
-- Monthly calendar using the Spain time zone, with accurate month lengths and a compact `1 cita` / `N citas` count for each day.
+- Monthly calendar using the Spain time zone, with accurate month lengths and a compact numeric appointment count on each day.
 - The current date is selected automatically when the app opens.
 - Create and edit appointments with a client, date, AM/PM time, one or more services, per-appointment prices, tips, and service notes.
 - Keep the appointment editor focused by choosing services from a dedicated selector; only the selected services and their per-appointment prices remain visible in the form.
@@ -15,6 +15,7 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - The WhatsApp action opens an editable, client-specific reminder with the appointment date, time, services, and salon address already filled in.
 - The app prevents appointments less than 15 minutes apart, without imposing artificial service durations.
 - Search the appointments of the selected day by client name or service name.
+- Find a client by typing their name in the appointment editor's client search field.
 
 ### Clients and services
 
@@ -29,6 +30,8 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 - Review paid appointments for today, a selected month, or a custom date range.
 - Date-range validation prevents a start date after the end date and vice versa.
 - Revenue from services and tips is always presented separately, along with the combined total.
+- Record whether each paid appointment was paid in cash or by card, then filter the selected date range and see the number of payments for each method.
+- Older paid appointments without a recorded method appear as unspecified; tap their paid status in Agenda to assign or correct the method.
 - The detailed list preserves the client, date, services, amount, and optional tip for every paid appointment.
 
 ### Daily reminders
@@ -45,11 +48,11 @@ An offline Android appointment manager designed for a nail salon. It keeps clien
 
 ### Backups and privacy
 
-- Export all clients, services, appointments, statuses, prices, tips, and notes to a portable JSON backup.
+- Export all clients, services, appointments, statuses, payment methods, prices, tips, and notes to a portable JSON backup.
 - Importing a backup first displays its creation date and the number of clients, services, and appointments it contains.
 - Restoration requires explicit confirmation because it replaces the local salon data.
 - Settings display the date and time of the latest backup saved on the device.
-- Backups preserve the manual service order and are compatible with legacy formats 1 and 2; service durations are intentionally not stored.
+- Backups preserve the manual service order and payment methods and are compatible with legacy formats 1, 2, and 3; service durations are intentionally not stored.
 
 ### Brand and accessibility
 

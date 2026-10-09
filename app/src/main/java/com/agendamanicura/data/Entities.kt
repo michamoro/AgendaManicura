@@ -26,6 +26,7 @@ data class ServiceEntity(
 )
 
 enum class AppointmentStatus { PENDING, PAID, CANCELLED }
+enum class PaymentMethod { CASH, CARD }
 
 @Entity(tableName = "appointments", foreignKeys = [ForeignKey(entity = ClientEntity::class, parentColumns = ["id"], childColumns = ["clientId"], onDelete = ForeignKey.RESTRICT)], indices = [Index("clientId"), Index("startAt")])
 data class AppointmentEntity(
@@ -34,7 +35,8 @@ data class AppointmentEntity(
     val startAt: Long,
     val notes: String = "",
     val tipCents: Long = 0,
-    val status: AppointmentStatus = AppointmentStatus.PENDING
+    val status: AppointmentStatus = AppointmentStatus.PENDING,
+    val paymentMethod: PaymentMethod? = null
 )
 
 @Entity(tableName = "appointment_services", primaryKeys = ["appointmentId", "serviceId"], indices = [Index("serviceId")], foreignKeys = [

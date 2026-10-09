@@ -41,7 +41,7 @@ class AgendaViewModel @Inject constructor(private val repository: AgendaReposito
         repository.saveAppointment(AppointmentEntity(id = appointmentId, clientId = clientId, startAt = start, notes = notes, tipCents = tipCents, status = status), selected.map { AppointmentServiceEntity(0, it.id, it.name, it.icon, overridePrices[it.id] ?: it.basePriceCents) })
         onResult(null)
     }
-    fun setStatus(id: Long, status: AppointmentStatus) = viewModelScope.launch { repository.updateStatus(id, status) }
+    fun setStatus(id: Long, status: AppointmentStatus, paymentMethod: PaymentMethod? = null) = viewModelScope.launch { repository.updateStatus(id, status, paymentMethod) }
     fun deleteAppointment(id: Long) = viewModelScope.launch { repository.deleteAppointment(id) }
     fun setReminderHour(hour: Int) = viewModelScope.launch { reminderPreferences.setHour(hour) }
     fun testDailyReminder() { DailyReminder.test(appContext) }

@@ -12,7 +12,7 @@ data class BackupPreview(val createdAt: Long?, val clients: Int, val services: I
 
 fun parseBackupPreview(raw: String): BackupPreview {
     val backup = JSONObject(raw)
-    require(backup.optInt("format") in 1..3) { "Este archivo no es una copia válida de Erika Nail Art." }
+    require(backup.optInt("format") in 1..4) { "Este archivo no es una copia válida de Erika Nail Art." }
     return BackupPreview(
         createdAt = backup.optLong("createdAt").takeIf { it > 0 },
         clients = backup.getJSONArray("clients").length(),
@@ -50,16 +50,20 @@ class AgendaRepository(private val db: AgendaDatabase) {
         appointments.insertServices(lines.map { it.copy(appointmentId = id) })
         id
     }
-    suspend fun updateStatus(id: Long, status: AppointmentStatus) { appointments.getById(id)?.let { appointments.update(it.appointment.copy(status = status)) } }
+    suspend fun updateStatus(id: Long, status: AppointmentStatus, paymentMethod: PaymentMethod? = null) {
+        appointments.getById(id)?.let {
+            appointments.update(it.appointment.copy(status = status, paymentMethod = if (status == AppointmentStatus.PAID) paymentMethod else null))
+        }
+    }
     suspend fun deleteAppointment(id: Long) { appointments.getById(id)?.let { appointments.delete(it.appointment) } }
     suspend fun createBackup(): String = db.withTransaction {
         JSONObject().apply {
-            put("format", 3)
+            put("format", 4)
             put("createdAt", System.currentTimeMillis())
             put("clients", JSONArray(db.clients().all().map { client -> JSONObject().apply { put("id", client.id); put("name", client.name); put("phone", client.phone); put("contactDetails", client.contactDetails); put("notes", client.notes); put("isActive", client.isActive) } }))
             put("services", JSONArray(db.services().all().map { service -> JSONObject().apply { put("id", service.id); put("name", service.name); put("icon", service.icon); put("basePriceCents", service.basePriceCents); put("sortOrder", service.sortOrder) } }))
             put("appointments", JSONArray(appointments.all().map { item -> JSONObject().apply {
-                put("clientId", item.appointment.clientId); put("startAt", item.appointment.startAt); put("notes", item.appointment.notes); put("tipCents", item.appointment.tipCents); put("status", item.appointment.status.name)
+                put("clientId", item.appointment.clientId); put("startAt", item.appointment.startAt); put("notes", item.appointment.notes); put("tipCents", item.appointment.tipCents); put("status", item.appointment.status.name); item.appointment.paymentMethod?.let { put("paymentMethod", it.name) }
                 put("services", JSONArray(item.services.map { line -> JSONObject().apply { put("serviceId", line.serviceId); put("name", line.serviceNameSnapshot); put("icon", line.iconSnapshot); put("priceCents", line.priceCents) } }))
             } }))
         }.toString(2)
@@ -67,7 +71,7 @@ class AgendaRepository(private val db: AgendaDatabase) {
     fun previewBackup(raw: String): BackupPreview = parseBackupPreview(raw)
     suspend fun restoreBackup(raw: String) = db.withTransaction {
         val backup = JSONObject(raw)
-        require(backup.optInt("format") in 1..3) { "Este archivo no es una copia válida de Erika Nail Art." }
+        require(backup.optInt("format") in 1..4) { "Este archivo no es una copia válida de Erika Nail Art." }
         val clientIds = mutableMapOf<Long, Long>(); val serviceIds = mutableMapOf<Long, Long>()
         appointments.deleteAll(); db.clients().deleteAll(); db.services().deleteAll()
         val clients = backup.getJSONArray("clients")
@@ -76,7 +80,7 @@ class AgendaRepository(private val db: AgendaDatabase) {
         for (index in 0 until services.length()) { val item = services.getJSONObject(index); serviceIds[item.getLong("id")] = db.services().insert(ServiceEntity(name = item.getString("name"), icon = item.optString("icon", "manicure"), basePriceCents = item.getLong("basePriceCents"), sortOrder = item.optLong("sortOrder", index.toLong() + 1))) }
         val appointmentsJson = backup.getJSONArray("appointments")
         for (index in 0 until appointmentsJson.length()) { val item = appointmentsJson.getJSONObject(index); val clientId = clientIds[item.getLong("clientId")] ?: continue
-            val appointmentId = appointments.insert(AppointmentEntity(clientId = clientId, startAt = item.getLong("startAt"), notes = item.optString("notes"), tipCents = item.optLong("tipCents"), status = runCatching { AppointmentStatus.valueOf(item.optString("status")) }.getOrDefault(AppointmentStatus.PENDING)))
+            val appointmentId = appointments.insert(AppointmentEntity(clientId = clientId, startAt = item.getLong("startAt"), notes = item.optString("notes"), tipCents = item.optLong("tipCents"), status = runCatching { AppointmentStatus.valueOf(item.optString("status")) }.getOrDefault(AppointmentStatus.PENDING), paymentMethod = runCatching { PaymentMethod.valueOf(item.optString("paymentMethod")) }.getOrNull()))
             val lines = item.getJSONArray("services"); val restoredLines = mutableListOf<AppointmentServiceEntity>()
             for (lineIndex in 0 until lines.length()) { val line = lines.getJSONObject(lineIndex); val serviceId = serviceIds[line.getLong("serviceId")] ?: continue; restoredLines += AppointmentServiceEntity(appointmentId, serviceId, line.optString("name"), line.optString("icon"), line.optLong("priceCents")) }
             if (restoredLines.isNotEmpty()) appointments.insertServices(restoredLines)
