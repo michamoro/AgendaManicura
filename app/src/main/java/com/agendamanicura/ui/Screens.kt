@@ -60,7 +60,10 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
         val leading = month.atDay(1).dayOfWeek.value - 1
         val cells = List(leading) { null } + (1..month.lengthOfMonth()).map(month::atDay)
         val weekCount = (cells.size + 6) / 7
-        LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.height((weekCount * 62).dp)) { items(cells) { day -> if (day == null) Box(Modifier.aspectRatio(.86f)) else DayCell(day, selectedDay == day, byDay[day].orEmpty().filter { it.appointment.status != AppointmentStatus.CANCELLED }) { selectedDay = day } } }
+        LazyVerticalGrid(columns = GridCells.Fixed(7), modifier = Modifier.height((weekCount * 62).dp)) { items(cells) { day -> if (day == null) Box(Modifier.aspectRatio(.86f)) else {
+            val savedCount = byDay[day].orEmpty().count { it.appointment.status != AppointmentStatus.CANCELLED }
+            DayCell(day, selectedDay == day, savedCount) { selectedDay = day }
+        } } }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("Citas del ${selectedDay.format(DateTimeFormatter.ofPattern("d 'de' MMMM", Locale("es")))}", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             FilledTonalButton(onClick = { editing = null; showEditor = true }) { Icon(Icons.Default.Add, null); Spacer(Modifier.width(4.dp)); Text("Cita") }
@@ -89,17 +92,17 @@ fun CalendarScreen(vm: AgendaViewModel, clients: List<ClientEntity>, services: L
 }
 
 @Composable
-private fun DayCell(day: LocalDate, selected: Boolean, items: List<AppointmentWithDetails>, onClick: () -> Unit) {
+private fun DayCell(day: LocalDate, selected: Boolean, appointmentCount: Int, onClick: () -> Unit) {
     Column(Modifier.padding(2.dp).aspectRatio(.86f).background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(day.dayOfMonth.toString(), fontWeight = FontWeight.Bold)
-        if (items.isNotEmpty()) {
+        if (appointmentCount > 0) {
             Box(
-                modifier = Modifier.align(Alignment.End).height(30.dp)
+                modifier = Modifier.align(Alignment.End).widthIn(min = 20.dp).heightIn(min = 24.dp)
                     .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 3.dp),
+                    .padding(horizontal = 3.dp, vertical = 1.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(items.size.toString(), fontSize = 24.sp, lineHeight = 24.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
+                Text(appointmentCount.toString(), fontSize = 16.sp, lineHeight = 18.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
             }
         }
     }
