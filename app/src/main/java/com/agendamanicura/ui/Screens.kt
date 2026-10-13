@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
@@ -97,12 +98,12 @@ private fun DayCell(day: LocalDate, selected: Boolean, appointmentCount: Int, on
         Text(day.dayOfMonth.toString(), fontWeight = FontWeight.Bold)
         if (appointmentCount > 0) {
             Box(
-                modifier = Modifier.align(Alignment.End).widthIn(min = 20.dp).heightIn(min = 24.dp)
+                modifier = Modifier.align(Alignment.End).widthIn(min = 24.dp).height(24.dp)
                     .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(6.dp))
-                    .padding(horizontal = 3.dp, vertical = 1.dp),
+                    .padding(horizontal = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(appointmentCount.toString(), fontSize = 16.sp, lineHeight = 18.sp, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
+                Text(appointmentCount.toString(), fontSize = 14.sp, lineHeight = 16.sp, fontFamily = FontFamily.SansSerif, maxLines = 1, softWrap = false, fontWeight = FontWeight.Bold)
             }
         }
     }
