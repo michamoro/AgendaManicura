@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.window.PopupProperties
 import com.agendamanicura.R
 import com.agendamanicura.data.*
 import java.time.*
@@ -333,7 +334,7 @@ private fun ClientPicker(clients: List<ClientEntity>, selected: Long, select: (L
             )
             if (expanded && query.isNotBlank() && matches.isEmpty()) Text("No se encontraron clientas", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 12.dp, top = 4.dp))
         }
-        DropdownMenu(expanded = expanded && query.isNotBlank() && matches.isNotEmpty(), onDismissRequest = { expanded = false }, modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+        DropdownMenu(expanded = expanded && query.isNotBlank() && matches.isNotEmpty(), onDismissRequest = { expanded = false }, modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp), properties = PopupProperties(focusable = false)) {
             matches.forEach { client -> DropdownMenuItem(text = { Text(client.name) }, onClick = { query = client.name; select(client.id); expanded = false }) }
         }
     }
